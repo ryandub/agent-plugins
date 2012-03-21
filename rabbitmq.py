@@ -23,7 +23,7 @@
 # Cloudkick plugin for monitoring a RabbitMQ stats.
 #
 # Example usage (arguments which you pass in to the plugin the Cloudkick
-#                dashboard):
+# dashboard):
 #
 # Monitor queue "bg_jobs" memory usage, number of consumers and number of
 # messages:
@@ -33,6 +33,12 @@
 # Monitor exchange "amqp.direct" type, durability and auto_delete value
 #
 # --action list_exchanges --exchange amqp.direct --parameters type,durable,auto_delete
+#
+# Monitor queue "bg_jobs" memory usage, number of consumers, number of
+# messages and alert if messages over 100
+#
+# --action list_queues --queue bg_jobs --queue-length 100 ---parameters memory,consumers,messages
+#
 
 import re
 import sys
@@ -127,6 +133,8 @@ if __name__ == '__main__':
   parser.add_option('--parameters', action='store', dest='parameters',
                     default='messages',
                     help='Comma separated list of parameters to retrieve (default = messages)')
+  parser.add_option('--queue-length', type='int', action='store', dest='length',
+		    help='Max messages in the queue before alert')
 
   (options, args) = parser.parse_args(sys.argv)
 
@@ -136,6 +144,7 @@ if __name__ == '__main__':
   queue = getattr(options, 'queue', None)
   exchange = getattr(options, 'exchange', None)
   parameters = options.parameters
+  length = getattr(options, 'length', None)
 
   if not action:
     print 'status err Missing required argument: action'
@@ -162,6 +171,11 @@ if __name__ == '__main__':
   if error:
     print 'status err %s' % (error)
     sys.exit(1)
-
+  if length is not None and metrics.has_key('messages'):  
+    if int(metrics['messages']) > length:
+      print 'status err Message queue %s at %d and above threshold of %d' % (
+	    queue, int(metrics['messages']), length)
+      sys.exit(1)
+  print metrics['messages']
   print 'status ok metrics successfully retrieved'
   print_metrics(action, metrics)
